@@ -25,19 +25,17 @@ class Observation:
     actions: List[Action]  # 他のプレーヤーのaction
 
 
-RSPActions = ["R", "S", "P"]
-
-
 class RSP(object):
     # Rock, Siccosrs, Paper
     rounds: int
 
     def __init__(self, rounds: int):
         self.rounds = rounds
+        self.hands = ["R", "S", "P"]
         super().__init__()
 
     def action_space(self) -> List[Action]:
-        return RSPActions
+        return self.hands
 
     def copy_inplace(self, target: Optional[Environment]):
         if not target:
@@ -54,20 +52,17 @@ class RSP(object):
 
     def calc_reward(self, actions) -> List[Reward]:
         # actionを実行したときのrewardを計算する stepはしない
-        reward1 = self.__get_reward_againts(actions[0], actions[1])
-        return [reward1, -reward1]
-
-    def __get_reward_againts(self, act1, act2) -> int:
         # R S P
-        id1 = RSPActions.index(act1)
-        id2 = RSPActions.index(act2)
+        id1 = self.hands.index(actions[0])
+        id2 = self.hands.index(actions[1])
         mod = (id2 - id1) % 3
+        r = 1
         if mod == 0:
-            return 0
+            return [0, 0]
         elif mod == 1:
-            return 1
+            return [r, -r]
         elif mod == 2:
-            return -1
+            return [-r, r]
 
         raise ValueError("action should be R, S or P.")
 
@@ -115,10 +110,14 @@ class RegretMatchingAgent(Agent):
     old_env: Optional[Environment]
 
     def __init__(self, index):
-        super().__init__(index, "regret_matching")
+        super().__init__(index, f"regret_matching({index})")
         self.regrets = None
         self.total_reward = 0
         self.old_env = None
+
+    def repr_state(self):
+        sum_of_regrets = max(sum(self.regrets or [0]), 0.1)
+        return [r / sum_of_regrets for r in (self.regrets or [])]
 
     def act(self, reward, env: Environment, agent_actions: List[Action]) -> Action:
         self.total_reward += reward
@@ -131,9 +130,11 @@ class RegretMatchingAgent(Agent):
                 cf_actions = copy.copy(agent_actions)
                 cf_actions[self.index] = action
 
-                regret = max(0, self.old_env.calc_reward(cf_actions)[self.index] - reward)
+                regret = max(0, self.old_env.calc_reward(
+                    cf_actions)[self.index] - reward)
                 self.regrets[action_i] += regret
-                action = self.random_pick(self.regrets, self.old_env.action_space() )
+                action = self.random_pick(
+                    self.regrets, self.old_env.action_space())
 
         else:
             action = random.choice(env.action_space())
@@ -145,7 +146,7 @@ class RegretMatchingAgent(Agent):
     def random_pick(self, weights, actions):
         ac = list(itertools.accumulate(weights))
         if ac[-1] > 0:
-            f = lambda : bisect.bisect(ac, random.randint(0, ac[-1]-1))
+            def f(): return bisect.bisect(ac, random.randint(0, ac[-1]-1))
             return actions[f()]
         else:
             return random.choice(actions)
@@ -163,8 +164,11 @@ def gameplay(env: Environment, agents: List[Agent]):
         for i in range(len(agents)):
             total_reward[i] += reward[i]
 
-        print(', '.join([f'{agent.name}: {action} -> {tr}' for action,
-                         agent, tr in zip(actions, agents, total_reward)]))
+        match_result = ', '.join(
+            [f'{agent.name}: {action} -> {tr}' for action,
+                agent, tr in zip(actions, agents, total_reward)]
+        )
+        print(f'{match_result}  {str(agents[0].repr_state())}')
 
         if done:
             for agent, tr in zip(agents, total_reward):
@@ -175,15 +179,19 @@ def gameplay(env: Environment, agents: List[Agent]):
 def init_agents(clss):
     return [a(i) for i, a in enumerate(clss)]
 
+
 if __name__ == "__main__":
-    env = RSP(rounds=100)
+    # env = RSP(["R", "S", "P"], rounds=10000)
+    env = RSP(rounds=100000)
     #gameplay(env, init_agents([RandomAgent, FirstAgent]))
-    gameplay(env, init_agents([RegretMatchingAgent, FirstAgent]))
+    # gameplay(env, init_agents([RegretMatchingAgent, FirstAgent]))
+    gameplay(env, init_agents([RegretMatchingAgent, RegretMatchingAgent]))
     # gameplay(env, [ManualAgent(), FirstAgent()])
     # gameplay(env, [RandomAgent(0), FirstAgent(1)])
     #gameplay(env, [ManualAgent(), FirstAgent()])
 
+
 def random_pick(weights, actions):
     ac = list(itertools.accumulate(weights))
-    f = lambda : bisect.bisect(ac, random.randint(0, ac[-1]-1))
+    def f(): return bisect.bisect(ac, random.randint(0, ac[-1]-1))
     return actions[f()]
