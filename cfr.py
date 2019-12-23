@@ -308,20 +308,23 @@ class CFR(Agent):
         if depth == 1:
             print("First iteration:", env.agent_states, datetime.datetime.now())
         if depth == 2:
-            print("    Second iteration:", env.agent_states, datetime.datetime.now())
+            print("    Second iteration:",
+                  env.agent_states, datetime.datetime.now())
         if depth == 3:
-            print("        Third iteration:", env.agent_states, datetime.datetime.now())
+            print("        Third iteration:",
+                  env.agent_states, datetime.datetime.now())
         counterpart_index = 1 - index
         action_space = env.action_space(index)
         vs = [0.0] * len(action_space)
         v = 0.0
 
-
         I = env.information_set(index)
+        search_node = random.randint(0, len(action_space)-1)
         for i, a in enumerate(action_space):
             prof = self.__get_profile(I, a, action_space)
             vs[i] = self.__cfr_counterpart(
                 a, env, counterpart_index, t, prof * pi_me, pi_c, depth)
+
             v += prof*vs[i]
 
         for i, a in enumerate(action_space):
@@ -344,7 +347,8 @@ class CFR(Agent):
         for i, a in enumerate(action_space):
             actions[counterpart_index] = a
 
-            new_env = env
+            # new_env = env
+            new_env = copy.deepcopy(env)
             rewards, done = new_env.step(actions)
 
             Inext = new_env.information_set(counterpart_index)
@@ -357,15 +361,16 @@ class CFR(Agent):
                 vs[i] = self.__cfr(new_env, index, t, pi_me,
                                    prof*pi_c, depth+1)
             v += prof * vs[i]
-            new_env.backtrack(actions)
+            # new_env.backtrack(actions)
         return v
 
     def __update_profiles(self, I, action_space):
         denominator = 0.0
         for a in action_space:
             denominator += self.cum_regrets[(I, a)]
-        if denominator > 0:
-            self.profile[(I, a)] = self.cum_regrets[(I, a)] / denominator
+        if denominator > 0.0001:
+            for a in action_space:
+                self.profile[(I, a)] = self.cum_regrets[(I, a)] / denominator
         else:
             d = 1.0 / len(action_space)
             for a in action_space:
@@ -387,14 +392,14 @@ class CFR(Agent):
         picked = self.random_pick(profiles, action_space)
 
         if debug:
-            print(f'picked {picked} from {action_space}.  prof={profiles}. ')
+            print(f'picked {picked} from {action_space}.  prof={profiles}. key={(I, picked)}')
         return picked
 
     def repr_state(self):
         pass
 
     def act(self, reward, env: Environment, actions: List[Action]) -> Action:
-        return self.__sample_action(self.index, env, False)
+        return self.__sample_action(self.index, env, True)
         # return action
 
     def update_policy(self, reward, agent_actions: List[Action]):
@@ -417,8 +422,7 @@ def gameplay(env_gen, agents: List[Agent], games: int):
         actions = None
         rewards = [0]*len(agents)
         while True:
-            actions = [agent.act(reward, env, actions)
-                    for agent, reward in zip(agents, rewards)]
+            actions = [agent.act(reward, env, actions) for agent, reward in zip(agents, rewards)]
 
             rewards, done = env.step(actions)
 
@@ -431,7 +435,7 @@ def gameplay(env_gen, agents: List[Agent], games: int):
                 break
 
         match_result = ', '.join(
-            [f'{agent.name}: {tr}' for action, tr in zip(actions, total_reward)]
+            [f'{agent.name}: {tr}' for agent, tr in zip(agents, total_reward)]
         )
         print(match_result)
 
@@ -447,13 +451,21 @@ def init_agents(clss):
     return [a(i) for i, a in enumerate(clss)]
 
 
+if __name__ == "__main__2":
+    with open("gj2222.pickle", "rb") as f:
+        cfr = pickle.load(f)
+        print(cfr.profile)
+
 if __name__ == "__main__":
-    print("now=",datetime.datetime.now())
+
+    print("now=", datetime.datetime.now())
     # env = RSP(["R", "S", "P"], rounds=10000)
 
     # env = GJ(GJState({'R': 2, 'S': 2, 'P': 2}, stars=2))
+    # cfr = CFR(1).train(env, T=2)
     # with open("gj2222.pickle", "wb") as f:
-    #     pickle.dump(env, f)
+    #     pickle.dump(cfr, f)
+
     # env = GJ(GJState({'R': 4, 'S': 4, 'P': 4}, stars=4))
     # with open("gj4444.pickle", "wb") as f:
     #     pickle.dump(env, f)
@@ -469,14 +481,22 @@ if __name__ == "__main__":
     # with open("gj3333.pickle", "wb") as f:
     #     pickle.dump(cfr, f)
 
-    env = GJ(GJState({'R': 4, 'S': 4, 'P': 4}, stars=3))
-    cfr = CFR(1).train(env, T=1)
-    with open("gj4443.pickle", "wb") as f:
-        pickle.dump(cfr, f)
-    sys.exit()
+    # env = GJ(GJState({'R': 2, 'S': 2, 'P': 2}, stars=2))
+    # cfr = CFR(1).train(env, T=1)
+    # with open("gj2222.pickle", "wb") as f:
+    #     pickle.dump(cfr, f)
 
-    with open("gj3333.pickle", "rb") as f:
+    # env = GJ(GJState({'R': 4, 'S': 4, 'P': 4}, stars=3))
+    # cfr = CFR(1).train(env, T=1)
+    # with open("gj4443.pickle", "wb") as f:
+    #     pickle.dump(cfr, f)
+    # sys.exit()
+
+    # with open("gj3333.pickle", "rb") as f:
+    #     cfr = pickle.load(f)
+    with open("gj2222.pickle", "rb") as f:
         cfr = pickle.load(f)
+    print(cfr)
 
     print("============== FINISHED TRAINING ==============")
     cfr.index = 1
@@ -484,7 +504,8 @@ if __name__ == "__main__":
     agents = [RandomAgent(0), cfr]
     #agents = [RandomAgent(0), RandomAgent(1)]
     # agents = [RandomAgent(0), RandomAgent(1)]
-        # env = GJ(GJState.single())
-    env_gen = lambda: GJ(GJState({'R': 4, 'S': 4, 'P': 4}, stars=3))
-    gameplay(env_gen, agents, games = 100)
+    # env = GJ(GJState.single())
 
+    # def env_gen(): return GJ(GJState({'R': 3, 'S': 3, 'P': 3}, stars=3))
+    def env_gen(): return GJ(GJState({'R': 2, 'S': 2, 'P': 2}, stars=2))
+    gameplay(env_gen, agents, games=10000)

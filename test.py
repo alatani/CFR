@@ -2,6 +2,7 @@
 from dataclasses import dataclass
 from typing import List, Optional, Dict
 import abc
+import pickle
 import random
 import copy
 import bisect
@@ -19,5 +20,6 @@ def random_pick(weights, actions):
 
 
 if __name__ == "__main__":
-    for _ in range(10):
-        print(random_pick([0.2, 0.7, 0.5], ["a", "b", "c"]))
+    with open("gj2222.pickle", "rb") as f:
+        cfr = pickle.load(f)
+    print(cfr)
