@@ -98,7 +98,9 @@ class GJ(Environment):
             my_state.n_cards['P'],
             my_state.stars,
             # 相手
-            sum(counterpart_state.n_cards.values()),  # 枚数だけわかる
+            counterpart_state.n_cards['R'], #今まで何枚使ったかわかるはず
+            counterpart_state.n_cards['S'],
+            counterpart_state.n_cards['P'],
             counterpart_state.stars,
         )
 
@@ -303,27 +305,36 @@ class CFR(Agent):
         else:
             return self.profile[(I, action)]
 
-    def __cfr(self, env: Environment, index, t, pi_me, pi_c, depth):
+    def __cfr(self, env: Environment, index, t, pi_me, pi_c, depth, chance=False, rewards=None):
         # 自分のターン
         if depth == 1:
             print("First iteration:", env.agent_states, datetime.datetime.now())
         if depth == 2:
             print("    Second iteration:",
                   env.agent_states, datetime.datetime.now())
-        if depth == 3:
-            print("        Third iteration:",
-                  env.agent_states, datetime.datetime.now())
+
+        if rewards:
+            return rewards[index]
+
         counterpart_index = 1 - index
         action_space = env.action_space(index)
         vs = [0.0] * len(action_space)
         v = 0.0
 
         I = env.information_set(index)
+
+        if chance:
+            action = self.__sample_action(index, env)
+            prof = self.__get_profile(I, action, action_space)
+            return self.__cfr_counterpart(action, env, counterpart_index, t, pi_me, pi_c, depth)
+
         search_node = random.randint(0, len(action_space)-1)
         for i, a in enumerate(action_space):
+            chance = i != search_node
+            chance = False
             prof = self.__get_profile(I, a, action_space)
             vs[i] = self.__cfr_counterpart(
-                a, env, counterpart_index, t, prof * pi_me, pi_c, depth)
+                a, env, counterpart_index, t, prof * pi_me, pi_c, depth, chance)
 
             v += prof*vs[i]
 
@@ -334,32 +345,32 @@ class CFR(Agent):
         self.__update_profiles(I, action_space)
         return v
 
-    def __cfr_counterpart(self, my_action, env: Environment, counterpart_index, t, pi_me, pi_c, depth):
+    def __cfr_counterpart(self, my_action, env: Environment, counterpart_index, t, pi_me, pi_c, depth, chance=False):
         # 相手のターン
         index = 1 - counterpart_index
         action_space = env.action_space(counterpart_index)
-
+        I = env.information_set(counterpart_index)
         actions = [None, None]
         actions[index] = my_action
+
         vs = [0.0] * len(action_space)
         v = 0.0
-        I = env.information_set(counterpart_index)
+        search_node = random.randint(0, len(action_space)-1)
         for i, a in enumerate(action_space):
+            #chance = False
             actions[counterpart_index] = a
 
             # new_env = env
             new_env = copy.deepcopy(env)
             rewards, done = new_env.step(actions)
+            if not done:
+                rewards = None
 
             Inext = new_env.information_set(counterpart_index)
 
             prof = self.__get_profile(I, a, action_space)
-            if done:
-                # terminal node
-                vs[i] = rewards[index]
-            else:
-                vs[i] = self.__cfr(new_env, index, t, pi_me,
-                                   prof*pi_c, depth+1)
+            vs[i] = self.__cfr(new_env, index, t, pi_me,
+                               prof*pi_c, depth+1, chance, rewards)
             v += prof * vs[i]
             # new_env.backtrack(actions)
         return v
@@ -367,10 +378,10 @@ class CFR(Agent):
     def __update_profiles(self, I, action_space):
         denominator = 0.0
         for a in action_space:
-            denominator += self.cum_regrets[(I, a)]
+            denominator += max(self.cum_regrets[(I, a)], 0)
         if denominator > 0.0001:
             for a in action_space:
-                self.profile[(I, a)] = self.cum_regrets[(I, a)] / denominator
+                self.profile[(I, a)] = max(self.cum_regrets[(I, a)],0) / denominator
         else:
             d = 1.0 / len(action_space)
             for a in action_space:
@@ -392,7 +403,8 @@ class CFR(Agent):
         picked = self.random_pick(profiles, action_space)
 
         if debug:
-            print(f'picked {picked} from {action_space}.  prof={profiles}. key={(I, picked)}')
+            print(
+                f'picked {picked} from {action_space}.  prof={profiles}. key={(I, picked)}')
         return picked
 
     def repr_state(self):
@@ -422,7 +434,8 @@ def gameplay(env_gen, agents: List[Agent], games: int):
         actions = None
         rewards = [0]*len(agents)
         while True:
-            actions = [agent.act(reward, env, actions) for agent, reward in zip(agents, rewards)]
+            actions = [agent.act(reward, env, actions)
+                       for agent, reward in zip(agents, rewards)]
 
             rewards, done = env.step(actions)
 
@@ -455,16 +468,17 @@ if __name__ == "__main__2":
     with open("gj2222.pickle", "rb") as f:
         cfr = pickle.load(f)
         print(cfr.profile)
+    sys.exit()
 
 if __name__ == "__main__":
 
     print("now=", datetime.datetime.now())
     # env = RSP(["R", "S", "P"], rounds=10000)
 
-    # env = GJ(GJState({'R': 2, 'S': 2, 'P': 2}, stars=2))
-    # cfr = CFR(1).train(env, T=2)
-    # with open("gj2222.pickle", "wb") as f:
-    #     pickle.dump(cfr, f)
+    env = GJ(GJState({'R': 2, 'S': 2, 'P': 2}, stars=2))
+    cfr = CFR(1).train(env, T=10)
+    with open("gj2222.pickle", "wb") as f:
+        pickle.dump(cfr, f)
 
     # env = GJ(GJState({'R': 4, 'S': 4, 'P': 4}, stars=4))
     # with open("gj4444.pickle", "wb") as f:
