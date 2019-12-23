@@ -344,7 +344,7 @@ class CFR(Agent):
         for i, a in enumerate(action_space):
             actions[counterpart_index] = a
 
-            new_env = copy.deepcopy(env)
+            new_env = env
             rewards, done = new_env.step(actions)
 
             Inext = new_env.information_set(counterpart_index)
@@ -357,7 +357,7 @@ class CFR(Agent):
                 vs[i] = self.__cfr(new_env, index, t, pi_me,
                                    prof*pi_c, depth+1)
             v += prof * vs[i]
-            #new_env.backtrack(actions)
+            new_env.backtrack(actions)
         return v
 
     def __update_profiles(self, I, action_space):
