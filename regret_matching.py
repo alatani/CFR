@@ -29,12 +29,12 @@ class RSP(object):
     # Rock, Siccosrs, Paper
     rounds: int
 
-    def __init__(self, rounds: int):
+    def __init__(self, rounds: int = 1):
         self.rounds = rounds
         self.hands = ["R", "S", "P"]
         super().__init__()
 
-    def action_space(self) -> List[Action]:
+    def action_space(self, agent_index: int) -> List[Action]:
         return self.hands
 
     def copy_inplace(self, target: Optional[Environment]):
@@ -65,6 +65,36 @@ class RSP(object):
             return [-r, r]
 
         raise ValueError("action should be R, S or P.")
+
+    def _calc_reward(self, actions) -> List[Reward]:
+        # actionを実行したときのrewardを計算する stepはしない
+        # R S P
+        act1 = actions[0]
+        act2 = actions[1]
+        if act1 == "R":
+            if act2 == "R":
+                return [0, 0]
+            if act2 == "S":
+                return [3, 0]
+            if act2 == "P":
+                return [0, 6]
+        if act1 == "S":
+            if act2 == "R":
+                return [0, 3]
+            if act2 == "S":
+                return [0, 0]
+            if act2 == "P":
+                return [6, 0]
+        if act1 == "P":
+            if act2 == "R":
+                return [6, 0]
+            if act2 == "S":
+                return [0, 6]
+            if act2 == "P":
+                return [0, 0]
+
+        raise ValueError("action should be R, S or P.")
+
 
 
 class Agent:
