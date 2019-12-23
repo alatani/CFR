@@ -1,7 +1,10 @@
+import datetime
 from dataclasses import dataclass
 import pickle
 from typing import List, Optional, Dict, Any
 import abc
+import cProfile
+import sys
 import random
 import copy
 import bisect
@@ -32,6 +35,9 @@ class GJState():
     def use_card(self, action: Action):
         assert(self.n_cards[action] > 0)
         self.n_cards[action] -= 1
+
+    def restore_card(self, action: Action):
+        self.n_cards[action] += 1
 
     def cards(self) -> int:
         return sum(n_cards.values())
@@ -100,6 +106,22 @@ class GJ(Environment):
         state = self.agent_states[agent_index]
         return state.get_usable_rsp()
 
+    def backtrack(self, actions) -> (List[Reward], bool):
+        for states, action in zip(self.agent_states, actions):
+            states.restore_card(action)
+        # 勝利判定
+        hands = ["R", "S", "P"]
+        id1 = hands.index(actions[0])
+        id2 = hands.index(actions[1])
+        mod = (id2 - id1) % 3
+        r = 1
+        if mod == 1:
+            self.agent_states[0].lose()
+            self.agent_states[1].win()
+        elif mod == 2:
+            self.agent_states[0].win()
+            self.agent_states[1].lose()
+
     def step(self, actions) -> (List[Reward], bool):
         # 各agentのスコアを返す
         assert(len(actions) == 2)
@@ -117,7 +139,6 @@ class GJ(Environment):
         if mod == 1:
             self.agent_states[0].win()
             self.agent_states[1].lose()
-            [1, -1]
         elif mod == 2:
             self.agent_states[0].lose()
             self.agent_states[1].win()
@@ -175,7 +196,11 @@ class RandomAgent(Agent):
         super().__init__(index, "random_agent")
 
     def act(self, reward, env: Environment, actions: List[Action]) -> Action:
-        return random.choice(env.action_space(self.index))
+        acs = env.action_space(self.index)
+        if acs:
+            return random.choice(acs)
+        else:
+            return None
 
     def update_policy(self, reward, agent_actions: List[Action]):
         pass
@@ -281,11 +306,16 @@ class CFR(Agent):
     def __cfr(self, env: Environment, index, t, pi_me, pi_c, depth):
         # 自分のターン
         if depth == 1:
-            print("First iteration:", env.agent_states)
+            print("First iteration:", env.agent_states, datetime.datetime.now())
+        if depth == 2:
+            print("    Second iteration:", env.agent_states, datetime.datetime.now())
+        if depth == 3:
+            print("        Third iteration:", env.agent_states, datetime.datetime.now())
         counterpart_index = 1 - index
         action_space = env.action_space(index)
         vs = [0.0] * len(action_space)
         v = 0.0
+
 
         I = env.information_set(index)
         for i, a in enumerate(action_space):
@@ -327,6 +357,7 @@ class CFR(Agent):
                 vs[i] = self.__cfr(new_env, index, t, pi_me,
                                    prof*pi_c, depth+1)
             v += prof * vs[i]
+            #new_env.backtrack(actions)
         return v
 
     def __update_profiles(self, I, action_space):
@@ -349,7 +380,7 @@ class CFR(Agent):
                 prof = self.profile[(I, a)]
             else:
                 prof = 1.0 / len(action_space)
-                print("anaume")
+                # print("anaume")
                 # init profile if not set yet
                 self.profile[(I, a)] = prof
             profiles.append(prof)
@@ -363,7 +394,7 @@ class CFR(Agent):
         pass
 
     def act(self, reward, env: Environment, actions: List[Action]) -> Action:
-        return self.__sample_action(self.index, env, True)
+        return self.__sample_action(self.index, env, False)
         # return action
 
     def update_policy(self, reward, agent_actions: List[Action]):
@@ -378,32 +409,38 @@ class CFR(Agent):
             return random.choice(actions)
 
 
-def gameplay(env: Environment, agents: List[Agent]):
-    rewards = [0]*len(agents)
+def gameplay(env_gen, agents: List[Agent], games: int):
     total_reward = [0]*len(agents)
-    actions = None
-    while True:
-        actions = [agent.act(reward, env, actions)
-                   for agent, reward in zip(agents, rewards)]
 
-        rewards, done = env.step(actions)
+    for t in range(games):
+        env = env_gen()
+        actions = None
+        rewards = [0]*len(agents)
+        while True:
+            actions = [agent.act(reward, env, actions)
+                    for agent, reward in zip(agents, rewards)]
 
-        for reward, agent in zip(rewards, agents):
-            agent.update_policy(reward, actions)
+            rewards, done = env.step(actions)
 
-        for i in range(len(agents)):
-            total_reward[i] += rewards[i]
-        #print(env.agent_states)
+            for reward, agent in zip(rewards, agents):
+                agent.update_policy(reward, actions)
 
-        if done:
-            break
+            for i in range(len(agents)):
+                total_reward[i] += rewards[i]
+            if done:
+                break
 
-    match_result = ', '.join(
-        [f'{agent.name}: {action} -> {tr}' for action,
-            agent, tr in zip(actions, agents, total_reward)]
-    )
-    # print(f'{match_result}  {str(agents[1].repr_state())}')
-    print(f'{match_result} ')
+        match_result = ', '.join(
+            [f'{agent.name}: {tr}' for action, tr in zip(actions, total_reward)]
+        )
+        print(match_result)
+
+    # match_result = ', '.join(
+    #     [f'{agent.name}: {action} -> {tr}' for action,
+    #         agent, tr in zip(actions, agents, total_reward)]
+    # )
+    # # print(f'{match_result}  {str(agents[1].repr_state())}')
+    # print(f'{match_result} ')
 
 
 def init_agents(clss):
@@ -411,6 +448,7 @@ def init_agents(clss):
 
 
 if __name__ == "__main__":
+    print("now=",datetime.datetime.now())
     # env = RSP(["R", "S", "P"], rounds=10000)
 
     # env = GJ(GJState({'R': 2, 'S': 2, 'P': 2}, stars=2))
@@ -426,19 +464,27 @@ if __name__ == "__main__":
     # with open("gj1111.pickle", "wb") as f:
     #     pickle.dump(env, f)
 
-    env = GJ(GJState({'R': 3, 'S': 3, 'P': 3}, stars=3))
+    # env = GJ(GJState({'R': 3, 'S': 3, 'P': 3}, stars=3))
+    # cfr = CFR(1).train(env, T=1)
+    # with open("gj3333.pickle", "wb") as f:
+    #     pickle.dump(cfr, f)
+
+    env = GJ(GJState({'R': 4, 'S': 4, 'P': 4}, stars=3))
     cfr = CFR(1).train(env, T=1)
-    with open("gj3333.pickle", "wb") as f:
+    with open("gj4443.pickle", "wb") as f:
         pickle.dump(cfr, f)
+    sys.exit()
+
+    with open("gj3333.pickle", "rb") as f:
+        cfr = pickle.load(f)
 
     print("============== FINISHED TRAINING ==============")
     cfr.index = 1
-    agents = [ManualAgent(0), cfr]
+    # agents = [ManualAgent(0), cfr]
+    agents = [RandomAgent(0), cfr]
+    #agents = [RandomAgent(0), RandomAgent(1)]
     # agents = [RandomAgent(0), RandomAgent(1)]
-    for i in range(300):
-        print()
-        print('==================')
-        print(f'{i+1}th game:')
         # env = GJ(GJState.single())
-        env = GJ(GJState.kaiji(stars=1))
-        gameplay(env, agents)
+    env_gen = lambda: GJ(GJState({'R': 4, 'S': 4, 'P': 4}, stars=3))
+    gameplay(env_gen, agents, games = 100)
+
