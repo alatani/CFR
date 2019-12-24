@@ -437,6 +437,15 @@ if __name__ == "__main__":
     # with open("gj2222.pickle", "wb") as f:
     #     pickle.dump(cfr, f)
 
+    # env = GJ(GJState({'R': 2, 'S': 2, 'P': 2}, stars=3))
+    # cfr = CFR(1).train(env, T=10)
+    # with open("gj2223.pickle", "wb") as f:
+    #     pickle.dump(cfr, f)
+    env = GJ(GJState({'R': 3, 'S': 3, 'P': 3}, stars=3))
+    cfr = CFR(1).train(env, T=10)
+    with open("gj2223.pickle", "wb") as f:
+        pickle.dump(cfr, f)
+
     # env = GJ(GJState({'R': 4, 'S': 4, 'P': 4}, stars=4))
     # with open("gj4444.pickle", "wb") as f:
     #     pickle.dump(env, f)
@@ -452,10 +461,10 @@ if __name__ == "__main__":
     # with open("gj3333.pickle", "wb") as f:
     #     pickle.dump(cfr, f)
 
-    env = GJ(GJState({'R': 2, 'S': 2, 'P': 2}, stars=2))
-    cfr = CFR(1).train(env, T=10)
-    with open("gj2222.pickle", "wb") as f:
-        pickle.dump(cfr, f)
+    # env = GJ(GJState({'R': 2, 'S': 2, 'P': 2}, stars=2))
+    # cfr = CFR(1).train(env, T=10)
+    # with open("gj2222.pickle", "wb") as f:
+    #     pickle.dump(cfr, f)
 
     # env = GJ(GJState({'R': 4, 'S': 4, 'P': 4}, stars=3))
     # cfr = CFR(1).train(env, T=1)
@@ -472,7 +481,7 @@ if __name__ == "__main__":
     # cfr.index = 1
     # agents = [RandomAgent(0), cfr]
     # def env_gen(): return GJ(GJState({'R': 1, 'S': 1, 'P': 1}, stars=1))
-    # gameplay(env_gen, agents, games=10000)
+    # gameplay(env_gen, agents, games=1000)
 
     # with open("gj2222.pickle", "rb") as f:
     #     cfr = pickle.load(f)
@@ -483,3 +492,16 @@ if __name__ == "__main__":
 
     # def env_gen(): return GJ(GJState({'R': 3, 'S': 3, 'P': 3}, stars=3))
     #def env_gen(): return GJ(GJState({'R': 1, 'S': 1, 'P': 1}, stars=1))
+
+    # with open("gj2223.pickle", "rb") as f:
+    #     cfr = pickle.load(f)
+    # cfr.index = 1
+    # agents = [RandomAgent(0), cfr]
+    # def env_gen(): return GJ(GJState({'R': 2, 'S': 2, 'P': 2}, stars=3))
+    # gameplay(env_gen, agents, games=10000)
+    with open("gj3333.pickle", "rb") as f:
+        cfr = pickle.load(f)
+    cfr.index = 1
+    agents = [RandomAgent(0), cfr]
+    def env_gen(): return GJ(GJState({'R': 2, 'S': 2, 'P': 2}, stars=3))
+    gameplay(env_gen, agents, games=10000)
