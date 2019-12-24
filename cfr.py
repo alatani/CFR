@@ -294,14 +294,14 @@ class CFR(Agent):
                 raise ValueError()
 
             v += prof*vs[i]
-        if I == ((0, 1, 1, 1), (0, 1, 1, 1)) and index == 0:
-            print("depth", depth)
-            print("index", index)
-            print("env", env.agent_states)
-            print("action_space", action_space)
-            print("vs", vs)
-            print("v", v)
-            print("turn", env.turn_of())
+        # if I == ((0, 1, 1, 1), (0, 1, 1, 1)) and index == 0:
+        #     print("depth", depth)
+        #     print("index", index)
+        #     print("env", env.agent_states)
+        #     print("action_space", action_space)
+        #     print("vs", vs)
+        #     print("v", v)
+        #     print("turn", env.turn_of())
 
         my_pi = [pi0, pi1][index]
         your_pi = [pi0, pi1][counterpart_index]
